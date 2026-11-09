@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Student Fee Management Portal</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    body { font-family: 'Inter', sans-serif; }
+  </style>
+</head>
+<body class="bg-emerald-50/40 min-h-screen text-slate-800 antialiased pb-12">
+
+  <header class="bg-gradient-to-r from-emerald-700 to-teal-800 text-white shadow-md sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+      <div class="flex items-center space-x-3">
+        <div class="bg-white/10 p-2 rounded-xl backdrop-blur-md">
+          <i data-lucide="graduation-cap" class="w-7 h-7 text-emerald-200"></i>
+        </div>
+        <div>
+          <h1 class="text-xl font-bold tracking-tight">3A Fee Pending Status</h1>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4 space-y-6">
+
+    <section class="bg-white rounded-2xl shadow-sm border border-emerald-100 p-6 relative">
+      <div class="max-w-2xl mx-auto text-center space-y-4">
+        <h2 class="text-lg font-bold text-slate-800">Enter the last 3 digits of the Roll Number</h2>
+               
+        <form onsubmit="handleSearch(event)" class="flex items-center justify-center gap-2">
+          <div class="flex items-center border-2 border-emerald-200 focus-within:border-emerald-600 rounded-xl overflow-hidden bg-slate-50 transition shadow-sm">
+            <span class="bg-emerald-100 text-emerald-900 font-bold px-3.5 py-2.5 text-sm border-r border-emerald-200 tracking-wider">
+              160924737
+            </span>
+            <input type="text" id="rollSuffixInput" maxlength="3" placeholder="007" 
+                   class="px-3 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none bg-transparent w-24 tracking-widest text-center">
+          </div>
+          <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-5 py-2.5 rounded-xl shadow transition flex items-center gap-2 text-sm">
+            <i data-lucide="search" class="w-4 h-4"></i> Check Status
+          </button>
+        </form>
+      </div>
+
+      <div id="searchResultContainer" class="mt-6 hidden"></div>
+    </section>
+
+    <div id="mainTableSection" class="space-y-4">
+      <div class="flex flex-wrap items-center justify-between border-b border-emerald-200/60 pb-3 gap-4">
+        <div class="flex gap-2">
+          <button onclick="switchTab('paid')" id="tab-paid" 
+                  class="flex items-center gap-2 px-4 py-2 rounded-xl font-semibold text-sm transition bg-emerald-600 text-white shadow-sm">
+            <i data-lucide="check-circle-2" class="w-4 h-4"></i> Paid Records
+          </button>
+          <button onclick="switchTab('pending')" id="tab-pending" 
+                  class="flex items-center gap-2 px-4 py-2 rounded-xl font-semibold text-sm transition bg-white text-slate-600 hover:bg-emerald-50 border border-slate-200">
+            <i data-lucide="clock" class="w-4 h-4"></i> Pending Fee
+          </button>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-medium text-slate-400 mr-1">Export Active View:</span>
+          <button onclick="exportToPDF()" title="Export PDF" class="p-2 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-xl border border-rose-200 transition">
+            <i data-lucide="file-text" class="w-4 h-4"></i>
+          </button>
+          <button onclick="exportToExcel()" title="Export Excel" class="p-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-xl border border-emerald-200 transition">
+            <i data-lucide="sheet" class="w-4 h-4"></i>
+          </button>
+          <button onclick="fetchSheetData()" title="Refresh Data" class="p-2 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-xl border border-slate-200 transition">
+            <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+          </button>
+          <button onclick="toggleMainTable()" title="Close Records Table" class="ml-2 p-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl shadow transition flex items-center justify-center">
+            <i data-lucide="x" class="w-5 h-5 font-bold"></i>
+          </button>
+        </div>
+      </div>
+
+      <section id="tableContainer" class="bg-white rounded-2xl shadow-sm border border-emerald-100 overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm">
+            <thead class="bg-emerald-50/80 text-emerald-950 font-semibold border-b border-emerald-100">
+              <tr>
+                <th class="py-3.5 px-4 text-center">S.No</th>
+                <th class="py-3.5 px-4">Hall Ticket No</th>
+                <th class="py-3.5 px-4 text-right">Attendance (%)</th>
+                <th class="py-3.5 px-4 text-right">Condonation Fee (₹)</th>
+                <th class="py-3.5 px-4 text-right">IXY Fee (₹)</th>
+                <th class="py-3.5 px-4 text-right">Internship (₹)</th>
+                <th class="py-3.5 px-4 text-right">Total Fee (₹)</th>
+                <th class="py-3.5 px-4 text-center">Status</th>
+                <th class="py-3.5 px-4">Timestamp</th>
+                <th class="py-3.5 px-4 text-center">Action</th>
+              </tr>
+            </thead>
+            <tbody id="tableBody" class="divide-y divide-slate-100"></tbody>
+            <tfoot id="tableFooter" class="bg-emerald-900 text-white font-bold"></tfoot>
+          </table>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <div id="paymentModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 relative border border-emerald-100 space-y-4">
+      <button onclick="closePaymentModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100 transition">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+
+      <div class="flex items-center gap-3">
+        <div class="p-2.5 bg-emerald-100 text-emerald-800 rounded-xl">
+          <i data-lucide="credit-card" class="w-6 h-6"></i>
+        </div>
+        <div>
+          <h3 class="text-base font-bold text-slate-800">Process Fee Payment</h3>
+          <p class="text-xs text-slate-500" id="modalHallTicketDisplay"></p>
+        </div>
+      </div>
+
+      <div class="bg-emerald-50/60 p-3 rounded-xl border border-emerald-100 text-xs space-y-1">
+        <div class="flex justify-between">
+          <span class="text-slate-500">Bill Amount Due:</span>
+          <strong class="text-emerald-900 text-sm" id="modalBillAmountDisplay">₹0</strong>
+        </div>
+      </div>
+
+      <div class="space-y-1.5">
+        <label class="block text-xs font-semibold text-slate-700">Re-type Total Bill Amount to Confirm (₹):</label>
+        <input type="number" id="modalVerifyAmountInput" placeholder="Enter bill amount" 
+               class="w-full px-3.5 py-2.5 border-2 border-emerald-200 focus:border-emerald-600 rounded-xl font-bold text-slate-800 focus:outline-none text-sm">
+      </div>
+
+      <div class="flex justify-end gap-2 pt-2">
+        <button onclick="closePaymentModal()" class="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-xs font-semibold hover:bg-slate-50 transition">
+          Cancel
+        </button>
+        <button onclick="confirmModalPayment()" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow transition flex items-center gap-1.5">
+          <i data-lucide="check" class="w-4 h-4"></i> Submit & Mark Paid
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const PREFIX = "160924737";
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxYexY1zp1rGRpdkjDWjNDHjWmYoe2W07DKOW7_P6K2Nva4j40ltDy8t-dc1Fgo0-W0HQ/exec";
+    
+    let currentTab = 'paid';
+    let isLoading = false;
+    let rawDataset = [];
+    let activeModalStudent = null;
+    let isTableOpen = true;
+
+    document.addEventListener("DOMContentLoaded", () => {
+      lucide.createIcons();
+      fetchSheetData();
+    });
+
+    function toggleMainTable() {
+      const container = document.getElementById('tableContainer');
+      isTableOpen = !isTableOpen;
+      container.classList.toggle('hidden', !isTableOpen);
+    }
+
+    async function fetchSheetData() {
+      isLoading = true;
+      renderTable();
+      try {
+        const res = await fetch(SCRIPT_URL);
+        const json = await res.json();
+        if (json && json.status === "success" && Array.isArray(json.data)) {
+          rawDataset = json.data;
+        }
+      } catch (err) {
+        console.error("Fetch error:", err);
+      } finally {
+        isLoading = false;
+        renderTable();
+      }
+    }
+
+    function isStudentDetained(student) {
+      const attendance = parseFloat(student.attendance) || 0;
+      const statusStr = String(student.status).trim();
+      return attendance < 30 || (statusStr === '0' && (parseFloat(student.total) || 0) === 0);
+    }
+
+    function isStudentPaid(student) {
+      return String(student.status).toLowerCase().trim() === 'paid';
+    }
+
+    function switchTab(tab) {
+      currentTab = tab;
+      const paidBtn = document.getElementById('tab-paid');
+      const pendingBtn = document.getElementById('tab-pending');
+
+      if (tab === 'paid') {
+        paidBtn.className = "flex items-center gap-2 px-4 py-2 rounded-xl font-semibold text-sm transition bg-emerald-600 text-white shadow-sm";
+        pendingBtn.className = "flex items-center gap-2 px-4 py-2 rounded-xl font-semibold text-sm transition bg-white text-slate-600 hover:bg-emerald-50 border border-slate-200";
+      } else {
+        pendingBtn.className = "flex items-center gap-2 px-4 py-2 rounded-xl font-semibold text-sm transition bg-emerald-600 text-white shadow-sm";
+        paidBtn.className = "flex items-center gap-2 px-4 py-2 rounded-xl font-semibold text-sm transition bg-white text-slate-600 hover:bg-emerald-50 border border-slate-200";
+      }
+
+      isTableOpen = true;
+      document.getElementById('tableContainer').classList.remove('hidden');
+      renderTable();
+    }
+
+    function getFilteredData() {
+      return rawDataset.filter(item => {
+        const paid = isStudentPaid(item);
+        return currentTab === 'paid' ? paid : !paid;
+      });
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById('tableBody');
+      const tfoot = document.getElementById('tableFooter');
+      
+      tbody.innerHTML = '';
+      tfoot.innerHTML = '';
+
+      if (isLoading) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="10" class="py-12 text-center text-teal-700 font-medium">
+              <div class="flex flex-col items-center gap-2">
+                <i data-lucide="loader-2" class="w-8 h-8 animate-spin text-emerald-600"></i>
+                <p>Loading real-time records from Google Sheet...</p>
+              </div>
+            </td>
+          </tr>`;
+        lucide.createIcons();
+        return;
+      }
+
+      const filtered = getFilteredData();
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="10" class="py-10 text-center text-slate-400 font-medium">
+              No ${currentTab} records found in Google Sheet.
+            </td>
+          </tr>`;
+        return;
+      }
+
+      let grandTotal = 0;
+
+      filtered.forEach((item, index) => {
+        grandTotal += (item.total || 0);
+        const detained = isStudentDetained(item);
+        const paid = isStudentPaid(item);
+
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-emerald-50/50 transition";
+        tr.innerHTML = `
+          <td class="py-3 px-4 text-center font-medium text-slate-500">${index + 1}</td>
+          <td class="py-3 px-4 font-bold text-slate-800">${item.hallTicketNo}</td>
+          <td class="py-3 px-4 text-right font-medium ${item.attendance < 30 ? 'text-rose-600 font-bold' : item.attendance < 75 ? 'text-amber-600 font-semibold' : ''}">${item.attendance}%</td>
+          <td class="py-3 px-4 text-right">₹${item.condonationFee || 0}</td>
+          <td class="py-3 px-4 text-right">₹${item.ixyFee || 0}</td>
+          <td class="py-3 px-4 text-right">₹${item.internship || 0}</td>
+          <td class="py-3 px-4 text-right font-bold text-emerald-800">₹${item.total || 0}</td>
+          <td class="py-3 px-4 text-center">
+            ${detained 
+              ? '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-700">Detained</span>'
+              : paid 
+                ? '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800"><i data-lucide="check" class="w-3 h-3"></i> Paid</span>'
+                : '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800">Pending</span>'}
+          </td>
+          <td class="py-3 px-4 text-xs text-slate-500">${item.timeStamp || '-'}</td>
+          <td class="py-3 px-4 text-center">
+            ${!paid && !detained 
+              ? `<button onclick="openPaymentModal('${item.hallTicketNo}')" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow transition">Pay Fee</button>` 
+              : '-'}
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      tfoot.innerHTML = `
+        <tr>
+          <td colspan="6" class="py-3.5 px-4 text-right font-bold tracking-wide">GRAND TOTAL (${currentTab.toUpperCase()}):</td>
+          <td class="py-3.5 px-4 text-right font-black text-base text-emerald-200">₹${grandTotal.toLocaleString('en-IN')}</td>
+          <td colspan="3"></td>
+        </tr>
+      `;
+
+      lucide.createIcons();
+    }
+
+    function handleSearch(e) {
+      e.preventDefault();
+      const suffix = document.getElementById('rollSuffixInput').value.trim();
+      const container = document.getElementById('searchResultContainer');
+
+      if (!suffix || suffix.length !== 3) {
+        alert("Please enter a valid 3-digit roll number (e.g. 007).");
+        return;
+      }
+
+      const fullHT = PREFIX + suffix;
+      const student = rawDataset.find(s => String(s.hallTicketNo).trim() === fullHT);
+
+      container.classList.remove('hidden');
+
+      if (!student) {
+        container.innerHTML = `
+          <div class="p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <i data-lucide="alert-circle" class="w-5 h-5 text-amber-600"></i>
+              <div>
+                <p class="font-bold">Roll Number ${fullHT} Not Found</p>
+                <p class="text-xs">Please verify the roll number digits entered.</p>
+              </div>
+            </div>
+            <button onclick="closeSearchCard()" class="text-emerald-600 hover:text-emerald-800 p-1"><i data-lucide="x" class="w-5 h-5 font-bold"></i></button>
+          </div>`;
+        lucide.createIcons();
+        return;
+      }
+
+      const detained = isStudentDetained(student);
+      const paid = isStudentPaid(student);
+
+      if (detained) {
+        container.innerHTML = `
+          <div class="p-5 bg-rose-50 border border-rose-200 rounded-xl text-rose-900 space-y-2 relative">
+            <button onclick="closeSearchCard()" class="absolute top-4 right-4 text-emerald-600 hover:text-emerald-800 p-1"><i data-lucide="x" class="w-5 h-5 font-bold"></i></button>
+            <div class="flex items-center gap-2 font-bold text-rose-700">
+              <i data-lucide="shield-alert" class="w-5 h-5"></i>
+              <span>Student Detained — Not Promoted (${student.hallTicketNo})</span>
+            </div>
+            <p class="text-xs text-rose-600">Attendance is ${student.attendance}% (Below 30% cutoff threshold). Total Fee: ₹0</p>
+          </div>`;
+      } else if (paid) {
+        container.innerHTML = `
+          <div class="p-5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-900 space-y-2 relative">
+            <button onclick="closeSearchCard()" class="absolute top-4 right-4 text-emerald-600 hover:text-emerald-800 p-1"><i data-lucide="x" class="w-5 h-5 font-bold"></i></button>
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2 font-bold text-emerald-800 text-base">
+                <span>${student.hallTicketNo}</span>
+                <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-200 text-emerald-900">Paid</span>
+              </div>
+            </div>
+            <p class="text-xs text-slate-600">Attendance: ${student.attendance}%</p>
+            
+            <div class="py-2 space-y-1 text-xs border-t border-b border-emerald-200/60 my-2">
+              <div class="flex justify-between py-0.5"><span class="text-slate-500">condonation :</span><span class="font-bold">₹${student.condonationFee || 0}</span></div>
+              <div class="flex justify-between py-0.5"><span class="text-slate-500">ixy fee :</span><span class="font-bold">₹${student.ixyFee || 0}</span></div>
+              <div class="flex justify-between py-0.5"><span class="text-slate-500">internship fee :</span><span class="font-bold">₹${student.internship || 0}</span></div>
+              <div class="flex justify-between py-0.5 text-emerald-900 text-sm"><span class="font-bold">total paid :</span><span class="font-black">₹${student.total}</span></div>
+            </div>
+
+            <div class="text-xs text-slate-500">Paid on: ${student.timeStamp || 'N/A'}</div>
+          </div>`;
+      } else {
+        container.innerHTML = `
+          <div class="p-5 bg-white border border-emerald-200 rounded-xl space-y-4 text-left shadow-sm relative max-w-lg mx-auto">
+            <button onclick="closeSearchCard()" class="absolute top-4 right-4 text-emerald-600 hover:text-emerald-800 p-1"><i data-lucide="x" class="w-5 h-5 font-bold"></i></button>
+            
+            <div class="flex justify-between items-start pr-8">
+              <div>
+                <h3 class="font-bold text-slate-800 text-base">${student.hallTicketNo}</h3>
+                <p class="text-xs text-slate-500">Attendance: ${student.attendance}% ${student.attendance < 75 ? '(Condonation Applied)' : ''}</p>
+              </div>
+              <span class="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800">Pending</span>
+            </div>
+
+            <div class="py-2 border-t border-b border-slate-100 space-y-2 text-xs">
+              <div class="flex justify-between items-center py-1 border-b border-slate-50">
+                <span class="text-slate-600 font-medium">condonation :</span>
+                <span class="font-bold text-slate-800">₹${student.condonationFee || 0}</span>
+              </div>
+              <div class="flex justify-between items-center py-1 border-b border-slate-50">
+                <span class="text-slate-600 font-medium">ixy fee :</span>
+                <span class="font-bold text-slate-800">₹${student.ixyFee || 0}</span>
+              </div>
+              <div class="flex justify-between items-center py-1 border-b border-slate-50">
+                <span class="text-slate-600 font-medium">internship fee :</span>
+                <span class="font-bold text-slate-800">₹${student.internship || 0}</span>
+              </div>
+              <div class="flex justify-between items-center py-1.5 pt-2 text-sm text-emerald-800 font-bold">
+                <span>total due :</span>
+                <span class="text-base font-black text-emerald-700">₹${student.total}</span>
+              </div>
+            </div>
+
+            <div class="space-y-3 pt-1">
+              <div class="w-full">
+                <label class="block text-[11px] font-semibold text-slate-500 mb-1">Re-type Bill Amount to Confirm (₹):</label>
+                <input type="number" id="searchVerifyAmountInput" placeholder="Re-type ${student.total}" 
+                       class="w-full px-3.5 py-2.5 border-2 border-emerald-200 focus:border-emerald-600 rounded-xl font-bold text-slate-800 focus:outline-none text-sm">
+              </div>
+              <button onclick="submitSearchPayment('${student.hallTicketNo}', ${student.total})" 
+                      class="w-full px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs shadow transition flex items-center justify-center gap-1.5">
+                <i data-lucide="check" class="w-4 h-4"></i> Submit & Mark Paid
+              </button>
+            </div>
+          </div>`;
+      }
+
+      lucide.createIcons();
+    }
+
+    function closeSearchCard() {
+      const container = document.getElementById('searchResultContainer');
+      container.classList.add('hidden');
+      container.innerHTML = '';
+      document.getElementById('rollSuffixInput').value = '';
+    }
+
+    function openPaymentModal(hallTicketNo) {
+      const student = rawDataset.find(s => String(s.hallTicketNo).trim() === hallTicketNo);
+      if (!student) return;
+
+      activeModalStudent = student;
+      document.getElementById('modalHallTicketDisplay').innerText = `Roll No: ${student.hallTicketNo}`;
+      document.getElementById('modalBillAmountDisplay').innerText = `₹${student.total}`;
+      document.getElementById('modalVerifyAmountInput').value = '';
+      
+      document.getElementById('paymentModal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closePaymentModal() {
+      document.getElementById('paymentModal').classList.add('hidden');
+      activeModalStudent = null;
+    }
+
+    async function confirmModalPayment() {
+      if (!activeModalStudent) return;
+      const enteredAmount = parseFloat(document.getElementById('modalVerifyAmountInput').value) || 0;
+      if (enteredAmount !== activeModalStudent.total) {
+        alert(`Amount mismatch! Please re-type the exact total bill amount (₹${activeModalStudent.total}).`);
+        return;
+      }
+      closePaymentModal();
+      await executePayment(activeModalStudent.hallTicketNo, activeModalStudent.total);
+    }
+
+    async function submitSearchPayment(hallTicketNo, expectedTotal) {
+      const enteredAmount = parseFloat(document.getElementById('searchVerifyAmountInput').value) || 0;
+      if (enteredAmount !== expectedTotal) {
+        alert(`Amount mismatch! Please re-type the exact total bill amount (₹${expectedTotal}).`);
+        return;
+      }
+      await executePayment(hallTicketNo, expectedTotal);
+    }
+
+    async function executePayment(hallTicketNo, amount) {
+      closeSearchCard();
+      try {
+        const res = await fetch(SCRIPT_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ hallTicketNo: hallTicketNo, paidAmount: amount })
+        });
+        const text = await res.text();
+        let json = {};
+        try { json = JSON.parse(text); } catch(e){}
+
+        if (json.status === "success" || res.ok) {
+          await fetchSheetData();
+        } else {
+          alert("Error updating sheet: " + (json.message || "Request failed"));
+        }
+      } catch (err) {
+        await fetchSheetData();
+      }
+    }
+
+    function exportToPDF() {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      doc.text(`Student Fee Report - ${currentTab.toUpperCase()}`, 14, 15);
+      
+      const filtered = getFilteredData();
+      let totalSum = 0;
+
+      const rows = filtered.map((item, idx) => {
+        totalSum += (item.total || 0);
+        return [
+          idx + 1,
+          item.hallTicketNo,
+          `${item.attendance}%`,
+          item.condonationFee || 0,
+          item.ixyFee || 0,
+          item.internship || 0,
+          item.total || 0,
+          item.status,
+          item.timeStamp || '-'
+        ];
+      });
+
+      rows.push([
+        { content: 'GRAND TOTAL', colSpan: 6, styles: { halign: 'right', fontStyle: 'bold' } },
+        { content: `INR ${totalSum}`, styles: { fontStyle: 'bold', fillColor: [209, 250, 229] } },
+        { content: '', colSpan: 2 }
+      ]);
+
+      doc.autoTable({
+        startY: 22,
+        head: [['S.No', 'Hall Ticket No', 'Attendance', 'Condonation', 'IXY Fee', 'Internship', 'Total Fee', 'Status', 'Timestamp']],
+        body: rows,
+        theme: 'grid',
+        headStyles: { fillStyle: [5, 150, 105] }
+      });
+
+      doc.save(`Fee_Report_${currentTab}_${Date.now()}.pdf`);
+    }
+
+    function exportToExcel() {
+      const filtered = getFilteredData();
+      const sheetData = filtered.map((item, idx) => ({
+        "SNo": idx + 1,
+        "HallTicketNo": item.hallTicketNo,
+        "Attendance (%)": item.attendance,
+        "Condonation Fee": item.condonationFee,
+        "IXY Fee": item.ixyFee,
+        "Internship": item.internship,
+        "Total Fee": item.total,
+        "Status": item.status,
+        "Time Stamp": item.timeStamp
+      }));
+
+      const worksheet = XLSX.utils.json_to_sheet(sheetData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, currentTab.toUpperCase());
+      XLSX.writeFile(workbook, `Fee_Report_${currentTab}_${Date.now()}.xlsx`);
+    }
+  </script>
+</body>
+</html>
