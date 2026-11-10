@@ -447,24 +447,19 @@ async function executePayment(hallTicketNo, amount, paymentMode) {
 
 // --- Universal APK & Browser Compatible Download/Export Functions ---
 
+// --- Universal APK & Browser Compatible Download Function ---
 function triggerDownload(blob, fileName, dataUri = null) {
-  // Mobile APK WebView check
+  // Check if running inside Android WebView / Mobile App environment
   const isMobileApp = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.ReactNativeWebView || window.flutter_inappwebview;
 
   if (isMobileApp && dataUri) {
-    const win = window.open(dataUri, '_blank');
-    if (!win) {
-      const link = document.createElement('a');
-      link.href = dataUri;
-      link.target = '_blank';
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }
+    // For Android APK / Mobile WebViews: Navigate directly within the same window 
+    // to avoid popup blocker restrictions and trigger native download/viewer.
+    window.location.href = dataUri;
     return;
   }
 
+  // Standard Browser Blob Download
   try {
     const blobUrl = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -481,7 +476,7 @@ function triggerDownload(blob, fileName, dataUri = null) {
       const fallbackLink = document.createElement('a');
       fallbackLink.href = e.target.result;
       fallbackLink.download = fileName;
-      fallbackLink.target = '_blank';
+      fallbackLink.target = '_self';
       document.body.appendChild(fallbackLink);
       fallbackLink.click();
       document.body.removeChild(fallbackLink);
