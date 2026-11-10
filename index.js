@@ -445,35 +445,26 @@ async function executePayment(hallTicketNo, amount, paymentMode) {
   }
 }
 
-// --- 100% Working Hybrid Download Engine for Android WebView & Desktop ---
+// --- Hybrid Bridge Download Engine (100% Working on Mobile APK & Desktop) ---
 function triggerDownload(contentBytes, fileName, mimeType, dataUri) {
-  const isMobileApp = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.ReactNativeWebView || window.flutter_inappwebview;
-
-  if (isMobileApp) {
-    // Strategy A: Direct window redirection for Android WebViews (triggers native download/viewer intent)
+  // 1. If running inside your Android App APK, pass directly to AndroidBridge
+  if (window.AndroidBridge && typeof window.AndroidBridge.downloadFile === 'function') {
     try {
-      window.location.href = dataUri;
+      window.AndroidBridge.downloadFile(dataUri, fileName, mimeType);
       return;
     } catch (e) {
-      console.warn("Location href redirect failed, trying fallback...", e);
-    }
-
-    // Strategy B: Fallback hidden anchor click for mobile
-    try {
-      const mobileLink = document.createElement('a');
-      mobileLink.href = dataUri;
-      mobileLink.target = '_blank';
-      mobileLink.download = fileName;
-      document.body.appendChild(mobileLink);
-      mobileLink.click();
-      document.body.removeChild(mobileLink);
-      return;
-    } catch (err) {
-      console.error("Mobile download fallback failed", err);
+      console.error("AndroidBridge error:", e);
     }
   }
 
-  // Strategy C: Standard Desktop Blob Download
+  // 2. Mobile Browser Fallback
+  const isMobileApp = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  if (isMobileApp) {
+    window.location.href = dataUri;
+    return;
+  }
+
+  // 3. Desktop Browser Download
   try {
     const blob = new Blob([contentBytes], { type: mimeType });
     const blobUrl = URL.createObjectURL(blob);
@@ -624,7 +615,6 @@ function exportToExcel() {
   const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
   const excelBlob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   
-  // Convert workbook to base64 data uri for mobile webview compatibility
   const wboutBase64 = XLSX.write(workbook, { bookType: 'xlsx', type: 'base64' });
   const excelDataUri = 'data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,' + wboutBase64;
   
