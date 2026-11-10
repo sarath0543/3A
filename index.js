@@ -445,22 +445,37 @@ async function executePayment(hallTicketNo, amount, paymentMode) {
   }
 }
 
-// --- Universal APK & Browser Compatible Download/Export Functions ---
-
-// --- Universal APK & Browser Compatible Download Function ---
-function triggerDownload(blob, fileName, dataUri = null) {
-  // Check if running inside Android WebView / Mobile App environment
+// --- 100% Working Hybrid Download Engine for Android WebView & Desktop ---
+function triggerDownload(contentBytes, fileName, mimeType, dataUri) {
   const isMobileApp = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.ReactNativeWebView || window.flutter_inappwebview;
 
-  if (isMobileApp && dataUri) {
-    // For Android APK / Mobile WebViews: Navigate directly within the same window 
-    // to avoid popup blocker restrictions and trigger native download/viewer.
-    window.location.href = dataUri;
-    return;
+  if (isMobileApp) {
+    // Strategy A: Direct window redirection for Android WebViews (triggers native download/viewer intent)
+    try {
+      window.location.href = dataUri;
+      return;
+    } catch (e) {
+      console.warn("Location href redirect failed, trying fallback...", e);
+    }
+
+    // Strategy B: Fallback hidden anchor click for mobile
+    try {
+      const mobileLink = document.createElement('a');
+      mobileLink.href = dataUri;
+      mobileLink.target = '_blank';
+      mobileLink.download = fileName;
+      document.body.appendChild(mobileLink);
+      mobileLink.click();
+      document.body.removeChild(mobileLink);
+      return;
+    } catch (err) {
+      console.error("Mobile download fallback failed", err);
+    }
   }
 
-  // Standard Browser Blob Download
+  // Strategy C: Standard Desktop Blob Download
   try {
+    const blob = new Blob([contentBytes], { type: mimeType });
     const blobUrl = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = blobUrl;
@@ -471,17 +486,7 @@ function triggerDownload(blob, fileName, dataUri = null) {
     document.body.removeChild(link);
     setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
   } catch (e) {
-    const reader = new FileReader();
-    reader.onload = function(e) {
-      const fallbackLink = document.createElement('a');
-      fallbackLink.href = e.target.result;
-      fallbackLink.download = fileName;
-      fallbackLink.target = '_self';
-      document.body.appendChild(fallbackLink);
-      fallbackLink.click();
-      document.body.removeChild(fallbackLink);
-    };
-    reader.readAsDataURL(blob);
+    window.location.href = dataUri;
   }
 }
 
@@ -535,7 +540,6 @@ function exportToPDF() {
     return baseRow;
   });
 
-  // Append subtotals & grand totals at the end
   if (isPaidTab) {
     rows.push([
       { content: 'SUBTOTALS', colSpan: 3, styles: { halign: 'right', fontStyle: 'bold' } },
@@ -569,24 +573,11 @@ function exportToPDF() {
     pageBreak: 'auto',
     showHead: 'everyPage',
     rowPageBreak: 'avoid',
-    styles: { 
-      font: 'times', 
-      fontSize: 12, 
-      cellPadding: 3, 
-      fontStyle: 'normal' 
-    },
-    headStyles: { 
-      font: 'times', 
-      fontStyle: 'bold', 
-      fontSize: 12, 
-      fillColor: [5, 150, 105], 
-      textColor: 255, 
-      halign: 'center' 
-    },
+    styles: { font: 'times', fontSize: 12, cellPadding: 3, fontStyle: 'normal' },
+    headStyles: { font: 'times', fontStyle: 'bold', fontSize: 12, fillColor: [5, 150, 105], textColor: 255, halign: 'center' },
     tableWidth: 'auto',
     margin: { left: 10, right: 10 },
     didDrawPage: function (data) {
-      // Draw Title strictly on the 1st page only
       if (data.pageNumber === 1) {
         doc.setFont("times", "bold");
         doc.setFontSize(16);
@@ -597,10 +588,11 @@ function exportToPDF() {
 
   const timeSuffix = getFormattedTimeSuffix();
   const fileName = `Fee_Report_${currentTab}_${timeSuffix}.pdf`;
+  
   const pdfBlob = doc.output('blob');
   const pdfDataUri = doc.output('datauristring');
   
-  triggerDownload(pdfBlob, fileName, pdfDataUri);
+  triggerDownload(pdfBlob, fileName, 'application/pdf', pdfDataUri);
 }
 
 function exportToExcel() {
@@ -632,8 +624,12 @@ function exportToExcel() {
   const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
   const excelBlob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   
+  // Convert workbook to base64 data uri for mobile webview compatibility
+  const wboutBase64 = XLSX.write(workbook, { bookType: 'xlsx', type: 'base64' });
+  const excelDataUri = 'data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,' + wboutBase64;
+  
   const timeSuffix = getFormattedTimeSuffix();
   const fileName = `Fee_Report_${currentTab}_${timeSuffix}.xlsx`;
   
-  triggerDownload(excelBlob, fileName);
+  triggerDownload(excelBlob, fileName, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', excelDataUri);
 }
