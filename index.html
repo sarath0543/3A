@@ -524,6 +524,7 @@
     }
 
     // --- Mobile-Compatible Export Functions (Data URI for WebViews) ---
+// --- Mobile & APK Compatible Export Functions ---
 
     function exportToPDF() {
       const { jsPDF } = window.jspdf;
@@ -570,13 +571,22 @@
         headStyles: { fillStyle: [5, 150, 105] }
       });
 
-      const pdfDataUri = doc.output('datauristring');
-      const link = document.createElement('a');
-      link.href = pdfDataUri;
-      link.download = `Fee_Report_${currentTab}_${Date.now()}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      const fileName = `Fee_Report_${currentTab}_${Date.now()}.pdf`;
+
+      try {
+        const blob = doc.output('blob');
+        const blobUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+      } catch (e) {
+        const pdfDataUri = doc.output('datauristring');
+        window.open(pdfDataUri, '_blank');
+      }
     }
 
     function exportToExcel() {
@@ -604,15 +614,25 @@
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, currentTab.toUpperCase());
       
-      const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'base64' });
-      const excelDataUri = 'data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,' + wbout;
+      const fileName = `Fee_Report_${currentTab}_${Date.now()}.xlsx`;
 
-      const link = document.createElement('a');
-      link.href = excelDataUri;
-      link.download = `Fee_Report_${currentTab}_${Date.now()}.xlsx`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      try {
+        const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+        const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const blobUrl = URL.createObjectURL(blob);
+        
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+      } catch (e) {
+        const wboutBase64 = XLSX.write(workbook, { bookType: 'xlsx', type: 'base64' });
+        const excelDataUri = 'data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,' + wboutBase64;
+        window.open(excelDataUri, '_blank');
+      }
     }
   </script>
 </body>
