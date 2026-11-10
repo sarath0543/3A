@@ -447,7 +447,24 @@ async function executePayment(hallTicketNo, amount, paymentMode) {
 
 // --- Universal APK & Browser Compatible Download/Export Functions ---
 
-function triggerDownload(blob, fileName) {
+function triggerDownload(blob, fileName, dataUri = null) {
+  // Mobile APK WebView check
+  const isMobileApp = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.ReactNativeWebView || window.flutter_inappwebview;
+
+  if (isMobileApp && dataUri) {
+    const win = window.open(dataUri, '_blank');
+    if (!win) {
+      const link = document.createElement('a');
+      link.href = dataUri;
+      link.target = '_blank';
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+    return;
+  }
+
   try {
     const blobUrl = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -461,9 +478,8 @@ function triggerDownload(blob, fileName) {
   } catch (e) {
     const reader = new FileReader();
     reader.onload = function(e) {
-      const dataUri = e.target.result;
       const fallbackLink = document.createElement('a');
-      fallbackLink.href = dataUri;
+      fallbackLink.href = e.target.result;
       fallbackLink.download = fileName;
       fallbackLink.target = '_blank';
       document.body.appendChild(fallbackLink);
@@ -524,7 +540,7 @@ function exportToPDF() {
     return baseRow;
   });
 
-  // Append subtotals & grand total rows at the end
+  // Append subtotals & grand totals at the end
   if (isPaidTab) {
     rows.push([
       { content: 'SUBTOTALS', colSpan: 3, styles: { halign: 'right', fontStyle: 'bold' } },
@@ -538,7 +554,6 @@ function exportToPDF() {
       { content: `ONLINE: INR ${onlineSum}   |   CASH: INR ${cashSum}   |   GRAND TOTAL: INR ${totalSum}`, colSpan: 10, styles: { halign: 'center', fontStyle: 'bold', fillColor: [209, 250, 229] } }
     ]);
   } else {
-    // Pending Report Subtotals & Grand Total Banner
     rows.push([
       { content: 'SUBTOTALS', colSpan: 3, styles: { halign: 'right', fontStyle: 'bold' } },
       { content: String(condonationSum), styles: { fontStyle: 'bold', halign: 'right' } },
@@ -588,7 +603,9 @@ function exportToPDF() {
   const timeSuffix = getFormattedTimeSuffix();
   const fileName = `Fee_Report_${currentTab}_${timeSuffix}.pdf`;
   const pdfBlob = doc.output('blob');
-  triggerDownload(pdfBlob, fileName);
+  const pdfDataUri = doc.output('datauristring');
+  
+  triggerDownload(pdfBlob, fileName, pdfDataUri);
 }
 
 function exportToExcel() {
